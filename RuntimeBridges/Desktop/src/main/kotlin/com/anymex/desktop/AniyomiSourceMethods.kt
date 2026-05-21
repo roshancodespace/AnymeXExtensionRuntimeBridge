@@ -550,7 +550,7 @@ object AniyomiSourceMethods {
 
                 val classLoader = java.net.URLClassLoader(arrayOf(tempJar.toURI().toURL()), DesktopExtensionLoader::class.java.classLoader)
                 var extractedVersion = "1.0.0"
-                var extractedPkgName = ""
+                var extractedPkgName = jar.nameWithoutExtension
 
                 val zipFile1 = java.util.zip.ZipFile(jar)
                 for (entry in zipFile1.entries()) {
@@ -559,8 +559,12 @@ object AniyomiSourceMethods {
                         try {
                             val clazz = Class.forName(className, false, classLoader)
                             try { extractedVersion = clazz.getField("VERSION_NAME").get(null) as String } catch(_: Exception) {}
-                            try { extractedPkgName = clazz.getField("APPLICATION_ID").get(null) as String } catch(_: Exception) {}
-                            if (extractedPkgName.isEmpty()) extractedPkgName = clazz.getPackage()?.name ?: ""
+                            try { 
+                                val appId = clazz.getField("APPLICATION_ID").get(null) as String 
+                                if (appId.isNotEmpty()) {
+                                    extractedPkgName = appId
+                                }
+                            } catch(_: Exception) {}
                         } catch (e: Exception) {
                             System.err.println("Could not parse BuildConfig: ${e.message}")
                         }
