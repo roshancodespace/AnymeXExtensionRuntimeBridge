@@ -49,28 +49,19 @@ target_include_directories(${PLUGIN_NAME} PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 
-# List of absolute paths to libraries that should be bundled with the plugin.
-# This list could contain prebuilt libraries, or libraries created by an
-# external build triggered from this build file.
 set(BUNDLE_LIBS "")
 
 set(DARTJNI_DLL "${CMAKE_CURRENT_SOURCE_DIR}/../build/windows-jni/dartjni.dll")
 if(NOT EXISTS "${DARTJNI_DLL}")
-  set(DARTJNI_DLL_FALLBACK "${CMAKE_CURRENT_SOURCE_DIR}/../build/jni_libs/dartjni.dll")
-  if(EXISTS "${DARTJNI_DLL_FALLBACK}")
-    set(DARTJNI_DLL "${DARTJNI_DLL_FALLBACK}")
-  endif()
+  set(DARTJNI_DLL "${CMAKE_CURRENT_SOURCE_DIR}/../build/jni_libs/dartjni.dll")
 endif()
 if(EXISTS "${DARTJNI_DLL}")
   list(APPEND BUNDLE_LIBS "${DARTJNI_DLL}")
 endif()
 
-set(JNI_JAR "${CMAKE_CURRENT_SOURCE_DIR}/../build/linux-jni/jni.jar")
+set(JNI_JAR "${CMAKE_CURRENT_SOURCE_DIR}/../build/windows-jni/jni.jar")
 if(NOT EXISTS "${JNI_JAR}")
-  set(JNI_JAR_FALLBACK "${CMAKE_CURRENT_SOURCE_DIR}/../build/jni_libs/jni.jar")
-  if(EXISTS "${JNI_JAR_FALLBACK}")
-    set(JNI_JAR "${JNI_JAR_FALLBACK}")
-  endif()
+  set(JNI_JAR "${CMAKE_CURRENT_SOURCE_DIR}/../build/jni_libs/jni.jar")
 endif()
 if(EXISTS "${JNI_JAR}")
   list(APPEND BUNDLE_LIBS "${JNI_JAR}")
