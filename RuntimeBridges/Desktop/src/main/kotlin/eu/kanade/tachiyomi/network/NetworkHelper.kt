@@ -17,32 +17,41 @@ import java.util.concurrent.TimeUnit
 class NetworkHelper(
     context: android.content.Context
 ) {
-    val cookieJar = object : CookieJar {
-        private val cookieStore = mutableMapOf<String, List<Cookie>>()
+    companion object {
+        val sharedCookieManager = java.net.CookieManager().apply {
+            setCookiePolicy(java.net.CookiePolicy.ACCEPT_ALL)
+        }
 
+        fun defaultUserAgentProvider() = "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
+    }
+
+    val cookieJar = object : CookieJar {
         override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-            cookieStore[url.host] = cookies
+            val uri = try { url.toUri() } catch (e: Exception) { java.net.URI(url.toString()) }
+            val headers = mapOf("Set-Cookie" to cookies.map { it.toString() })
+            try {
+                sharedCookieManager.put(uri, headers)
+            } catch (e: Exception) {
+                System.err.println("[WARN] Failed to save cookies for ${url.host}: ${e.message}")
+            }
         }
 
         override fun loadForRequest(url: HttpUrl): List<Cookie> {
-            return cookieStore[url.host] ?: emptyList()
+            val uri = try { url.toUri() } catch (e: Exception) { java.net.URI(url.toString()) }
+            try {
+                val headers = sharedCookieManager.get(uri, emptyMap())
+                val cookieHeaders = headers["Cookie"] ?: headers["cookie"] ?: return emptyList()
+                return cookieHeaders.flatMap { header ->
+                    header.split(";").mapNotNull { Cookie.parse(url, it.trim()) }
+                }
+            } catch (e: Exception) {
+                System.err.println("[WARN] Failed to load cookies for ${url.host}: ${e.message}")
+                return emptyList()
+            }
         }
     }
     var client: OkHttpClient = run {
-        val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(
-            object : javax.net.ssl.X509TrustManager {
-                override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) {}
-                override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) {}
-                override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
-            }
-        )
-
-        val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
-        sslContext.init(null, trustAllCerts, java.security.SecureRandom())
-
         val builder = OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
-            .hostnameVerifier { _, _ -> true }
             .cookieJar(cookieJar)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -80,9 +89,4 @@ class NetworkHelper(
     @Deprecated("The regular client handles Cloudflare by default")
     @Suppress("UNUSED")
     val cloudflareClient: OkHttpClient = client
-
-
-    companion object {
-        fun defaultUserAgentProvider() = "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
-    }
 }

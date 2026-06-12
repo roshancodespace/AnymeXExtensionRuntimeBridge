@@ -226,6 +226,8 @@ object CloudStreamExtensionLoader {
                 gson.toJson(result)
             }
         } catch (e: Throwable) {
+            System.err.println("[CS-Loader] ERROR: Outer search wrapper failed for $sourceId: ${e.message}")
+            e.printStackTrace()
             "{\"list\": [], \"hasNextPage\": false}"
         }
     }
