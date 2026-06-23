@@ -58,7 +58,14 @@ class AniyomiExtensions extends Extension {
     try {
       final List<dynamic> result = await platform.invokeMethod(method, path);
       final parsed = result
-          .map((e) => ASource.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) {
+            final source = ASource.fromJson(Map<String, dynamic>.from(e));
+            if (source.pkgName != null) {
+              final savedIcon = getVal<String>('aniyomi_ext_icon_${source.pkgName}');
+              if (savedIcon != null) source.iconUrl = savedIcon;
+            }
+            return source;
+          })
           .where((s) => s.itemType == type)
           .toList(growable: false);
 
@@ -232,13 +239,25 @@ class AniyomiExtensions extends Extension {
 
       if (repo == null) continue;
 
-      if (compareVersions(repo.version ?? "0", inst.version ?? "0") > 0) {
-        installed[i] = inst
-          ..hasUpdate = true
-          ..apkName = repo.apkName
-          ..iconUrl = repo.iconUrl
-          ..versionLast = repo.version;
+      bool needsUpdate = false;
 
+      if (compareVersions(repo.version ?? "0", inst.version ?? "0") > 0) {
+        inst.hasUpdate = true;
+        inst.apkName = repo.apkName;
+        inst.versionLast = repo.version;
+        needsUpdate = true;
+      }
+
+      if (inst.iconUrl == null || inst.iconUrl!.isEmpty || needsUpdate) {
+        inst.iconUrl = repo.iconUrl;
+        if (inst.pkgName != null && repo.iconUrl != null) {
+          setVal('aniyomi_ext_icon_${inst.pkgName}', repo.iconUrl);
+        }
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        installed[i] = inst;
         changed = true;
       }
     }
@@ -322,6 +341,11 @@ class AniyomiExtensions extends Extension {
         if (await apkFile.exists()) {
           await apkFile.delete();
         }
+      }
+
+      final pkgName = aSource.pkgName ?? packageName;
+      if (aSource.iconUrl != null) {
+        setVal('aniyomi_ext_icon_$pkgName', aSource.iconUrl);
       }
 
       final avail = getAvailableRx(aSource.itemType!);
