@@ -9,6 +9,7 @@ import 'Runtime/RuntimeController.dart';
 import 'Runtime/RuntimePaths.dart';
 import 'Runtime/Bridge/BridgeDispatcher.dart';
 import 'dart:async';
+
 class AnymeXRuntimeBridge {
   static const _channel = MethodChannel('anymeXBridge');
 
@@ -48,9 +49,14 @@ class AnymeXRuntimeBridge {
         _cachedVersion = data['version'] ?? '';
         _cachedReleaseTitle = data['title'] ?? '';
       } else {
-        _cachedVersion = getVal<String>('runtime_host_installed_version', defaultValue: '') ?? '';
-        _cachedReleaseTitle = getVal<String>('runtime_host_installed_release_title', defaultValue: '') ?? '';
-        
+        _cachedVersion = getVal<String>('runtime_host_installed_version',
+                defaultValue: '') ??
+            '';
+        _cachedReleaseTitle = getVal<String>(
+                'runtime_host_installed_release_title',
+                defaultValue: '') ??
+            '';
+
         if (_cachedVersion.isNotEmpty) {
           await metadataFile.writeAsString(jsonEncode({
             'version': _cachedVersion,
@@ -124,7 +130,10 @@ class AnymeXRuntimeBridge {
 
     if (exists) {
       if (Platform.isAndroid) {
-        await loadAnymeXRuntimeHost(bridgePath);
+        final success = await loadAnymeXRuntimeHost(bridgePath);
+        if (success) {
+          controller.setReady(true);
+        }
       } else {
         controller.setReady(true);
       }
@@ -311,7 +320,8 @@ class AnymeXRuntimeBridge {
 
     if (_cachedToolsDirPath != null) {
       try {
-        final metadataFile = File(p.join(_cachedToolsDirPath!, 'metadata.json'));
+        final metadataFile =
+            File(p.join(_cachedToolsDirPath!, 'metadata.json'));
         metadataFile.writeAsStringSync(jsonEncode({
           'version': version,
           'title': title,
