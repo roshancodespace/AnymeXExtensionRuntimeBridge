@@ -174,6 +174,7 @@ class AnymeXRuntimeBridge {
         } catch (e) {
           Logger.log('Failed to save runtime host APK path to KvStore: $e');
         }
+        controller.setReady(true);
       }
 
       _loadCompleter!.complete(isLoaded);
@@ -192,7 +193,11 @@ class AnymeXRuntimeBridge {
     if (Platform.isAndroid) {
       try {
         final result = await _channel.invokeMethod<bool>('isLoaded');
-        return result ?? false;
+        final loaded = result ?? false;
+        if (loaded && !controller.isReady.value) {
+          controller.setReady(true);
+        }
+        return loaded;
       } catch (e) {
         return false;
       }
@@ -330,5 +335,13 @@ class AnymeXRuntimeBridge {
         Logger.log("Failed to write metadata.json: $e");
       }
     }
+  }
+
+  static Future<bool> isLoadedFromStorage() async {
+    if (!Platform.isAndroid) return false;
+    final savedPath = getVal<String>('runtime_host_path');
+    if (savedPath == null || savedPath.isEmpty) return false;
+    final defaultPath = await RuntimePaths().bridgePath;
+    return savedPath != defaultPath;
   }
 }
