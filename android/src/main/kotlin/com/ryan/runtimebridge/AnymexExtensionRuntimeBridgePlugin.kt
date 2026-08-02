@@ -413,7 +413,14 @@ class AnymexExtensionRuntimeBridgePlugin : FlutterPlugin, ActivityAware {
                             args["isAnime"] as Boolean,
                             args["query"] as String,
                             args["page"] as Int,
+                            args["filters"] as? List<*>,
                             args["parameters"] as? Map<String, Any?>)
+                    }
+                    "getFilterList" -> {
+                        val args = call.arguments as Map<*, *>
+                        call("aniyomiGetFilterList", ctx,
+                            args["sourceId"] as String,
+                            args["isAnime"] as Boolean)
                     }
                     "getDetail" -> {
                         val args = call.arguments as Map<*, *>
@@ -430,6 +437,19 @@ class AnymexExtensionRuntimeBridgePlugin : FlutterPlugin, ActivityAware {
                             args["isAnime"] as Boolean,
                             args["episode"] as Map<String, Any?>,
                             args["parameters"] as? Map<String, Any?>)
+                    }
+                    "stopHttpServer" -> {
+                        val args = call.arguments as Map<*, *>
+                        call("aniyomiStopHttpServer", ctx,
+                            args["sourceId"] as String,
+                            args["isAnime"] as Boolean)
+                    }
+                    "getImageBytes" -> {
+                        val args = call.arguments as Map<*, *>
+                        call("aniyomiGetImageBytes", ctx,
+                            args["sourceId"] as String,
+                            args["isAnime"] as Boolean,
+                            args["url"] as String)
                     }
                     "getPageList" -> {
                         val args = call.arguments as Map<*, *>
