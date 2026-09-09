@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'PbDecoder.dart';
-import 'package:device_apps/device_apps.dart';
+import 'package:flutter_device_apps/flutter_device_apps.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:install_plugin/install_plugin.dart';
@@ -118,7 +118,7 @@ class AniyomiExtensions extends Extension {
       for (final s in parsed) {
         if (s.pkgName != null && s.pkgName!.isNotEmpty) {
           try {
-            final isSys = await DeviceApps.isAppInstalled(s.pkgName!);
+            final isSys = (await FlutterDeviceApps.getApp(s.pkgName!)) != null;
             s.isPrivate = !isSys;
           } catch (_) {}
         }
@@ -444,7 +444,7 @@ class AniyomiExtensions extends Extension {
       bool isSystemInstalled = false;
       if (aSource.pkgName != null && aSource.pkgName!.isNotEmpty) {
         try {
-          isSystemInstalled = await DeviceApps.isAppInstalled(aSource.pkgName!);
+          isSystemInstalled = (await FlutterDeviceApps.getApp(aSource.pkgName!)) != null;
         } catch (_) {}
       }
 
@@ -538,23 +538,20 @@ class AniyomiExtensions extends Extension {
         });
       } catch (_) {}
 
-      final isSystemInstalled = await DeviceApps.isAppInstalled(packageName);
+      final isSystemInstalled = (await FlutterDeviceApps.getApp(packageName)) != null;
       if (isSystemInstalled) {
-        final success = await DeviceApps.uninstallApp(packageName);
-        if (!success) {
-          throw Exception('Failed to initiate uninstallation for: $packageName');
-        }
+        await FlutterDeviceApps.uninstallApp(packageName);
 
         const timeout = Duration(seconds: 10);
         final start = DateTime.now();
 
         while (DateTime.now().difference(start) < timeout) {
-          final stillInstalled = await DeviceApps.isAppInstalled(packageName);
+          final stillInstalled = (await FlutterDeviceApps.getApp(packageName)) != null;
           if (!stillInstalled) break;
           await Future.delayed(const Duration(milliseconds: 500));
         }
 
-        final finalCheck = await DeviceApps.isAppInstalled(packageName);
+        final finalCheck = (await FlutterDeviceApps.getApp(packageName)) != null;
         if (finalCheck) {
           throw Exception('Uninstallation timed out or was cancelled by user.');
         }
