@@ -35,7 +35,8 @@ class ASource extends Source {
       versionLast: json['versionLast'],
       repo: json['repo'],
       hasUpdate: json['hasUpdate'] ?? false,
-      isPrivate: json['isPrivate'] ?? (json['isShared'] != null ? !(json['isShared'] as bool) : null),
+      isPrivate: json['isPrivate'] ??
+          (json['isShared'] != null ? !(json['isShared'] as bool) : null),
       supportsLatest: json['supportsLatest'] ?? false,
       supportsPopular: json['supportsPopular'] ?? false,
       itemType: ItemType.values[json['itemType'] ?? 0],
@@ -59,10 +60,14 @@ class ASource extends Source {
     }
 
     if (repo != null && repo!.startsWith('http')) {
-      final baseRepoUrl = repo!
+      var baseRepoUrl = repo!
           .replaceAll('/index.min.json', '')
+          .replaceAll('/index.json', '')
           .replaceAll('/index.pb.gz', '')
           .replaceAll('/index.pb', '');
+      if (baseRepoUrl.endsWith('/')) {
+        baseRepoUrl = baseRepoUrl.substring(0, baseRepoUrl.length - 1);
+      }
       return '$baseRepoUrl/apk/$apkName';
     }
 

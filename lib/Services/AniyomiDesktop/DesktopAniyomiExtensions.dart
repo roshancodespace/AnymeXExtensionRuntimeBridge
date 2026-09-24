@@ -53,7 +53,8 @@ class DesktopAniyomiExtensions extends DesktopExtensionBase {
   Future<void> fetchInstalledAnimeExtensions() async {
     final list = await _loadInstalled(ItemType.anime);
     getInstalledRx(ItemType.anime).value = list;
-    final available = getRawAvailableRx(ItemType.anime).value.whereType<ASource>().toList();
+    final available =
+        getRawAvailableRx(ItemType.anime).value.whereType<ASource>().toList();
     if (available.isNotEmpty) {
       _detectUpdates(available, ItemType.anime);
     }
@@ -63,7 +64,8 @@ class DesktopAniyomiExtensions extends DesktopExtensionBase {
   Future<void> fetchInstalledMangaExtensions() async {
     final list = await _loadInstalled(ItemType.manga);
     getInstalledRx(ItemType.manga).value = list;
-    final available = getRawAvailableRx(ItemType.manga).value.whereType<ASource>().toList();
+    final available =
+        getRawAvailableRx(ItemType.manga).value.whereType<ASource>().toList();
     if (available.isNotEmpty) {
       _detectUpdates(available, ItemType.manga);
     }
@@ -194,10 +196,14 @@ class DesktopAniyomiExtensions extends DesktopExtensionBase {
         decoded = PbDecoder.decodeIndex(bytes);
       }
 
-      final baseIconUrl = repoUrl
+      var baseIconUrl = repoUrl
           .replaceAll('/index.min.json', '')
+          .replaceAll('/index.json', '')
           .replaceAll('/index.pb.gz', '')
           .replaceAll('/index.pb', '');
+      if (baseIconUrl.endsWith('/')) {
+        baseIconUrl = baseIconUrl.substring(0, baseIconUrl.length - 1);
+      }
       final sources = <Source>[];
 
       for (final item in decoded) {
@@ -431,7 +437,8 @@ class DesktopAniyomiExtensions extends DesktopExtensionBase {
       File(tempZipPath).writeAsBytesSync(apkRes.bodyBytes);
 
       final outJarPath = p.join(extDir, '$pkgName.jar');
-      Logger.log("Converting Aniyomi APK to JAR via sidecar (embedded dex2jar)...");
+      Logger.log(
+          "Converting Aniyomi APK to JAR via sidecar (embedded dex2jar)...");
 
       // Delegate conversion to the sidecar which uses de.femtopedia.dex2jar library
       // (same as Dartotsu) — produces correct bytecode for modern coroutine/lambda patterns
@@ -443,7 +450,8 @@ class DesktopAniyomiExtensions extends DesktopExtensionBase {
       if (aSource.iconUrl != null) {
         setVal('desktop_ext_icon_$pkgName', aSource.iconUrl);
       }
-      final versionToSave = aSource.hasUpdate == true ? aSource.versionLast : aSource.version;
+      final versionToSave =
+          aSource.hasUpdate == true ? aSource.versionLast : aSource.version;
       if (versionToSave != null) {
         setVal('desktop_ext_version_$pkgName', versionToSave);
       }
