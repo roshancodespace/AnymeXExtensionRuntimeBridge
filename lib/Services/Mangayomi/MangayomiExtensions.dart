@@ -23,6 +23,10 @@ class MangayomiExtensions extends Extension {
   String get name => 'Mangayomi';
 
   @override
+  String get icon =>
+      'https://raw.githubusercontent.com/kodjodevf/mangayomi/main/assets/app_icons/icon-red.png';
+
+  @override
   SourceMethods createSourceMethods(Source source) =>
       MangayomiSourceMethods(source);
 
@@ -323,27 +327,6 @@ class MangayomiExtensions extends Extension {
       '$id${type.name}Repos',
       repos.map((e) => jsonEncode(e.toJson())).toList(),
     );
-  }
-
-  String _convertLang(String lang) {
-    switch (lang) {
-      case "English":
-        return "en";
-      case "Français":
-        return "fr";
-      case "Español":
-        return "es";
-      case "Português":
-        return "pt";
-      case "Русский":
-        return "ru";
-      case "日本語":
-        return "ja";
-      case "中文, 汉语, 漢語":
-        return "zh";
-      default:
-        return "all";
-    }
   }
 
   @override
