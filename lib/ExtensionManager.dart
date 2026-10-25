@@ -6,21 +6,11 @@ import 'package:get/get.dart';
 import 'Services/Aniyomi/AniyomiExtensions.dart';
 import 'Services/Aniyomi/Models/Source.dart';
 import 'Services/CloudStream/CloudStreamExtensions.dart';
-import 'Services/IReader/DesktopIReaderExtensions.dart';
-import 'Services/IReader/IReaderExtensions.dart';
-import 'Services/IReader/Models/Source.dart';
-import 'Services/Legado/LegadoExtensions.dart';
-import 'Services/LnReader/LnReaderExtensions.dart';
-import 'Services/LnReader/Models/Source.dart';
 import 'Services/Mangayomi/MangayomiExtensions.dart';
 import 'Services/Sora/Models/Source.dart';
 import 'Services/Sora/SoraExtensions.dart';
-import 'Services/Tsundoku/DesktopTsundokuExtensions.dart';
-import 'Services/Tsundoku/Models/Source.dart';
-import 'Services/Tsundoku/TsundokuExtensions.dart';
 import 'anymex_extension_runtime_bridge.dart';
-
-import 'Settings/KvStore.dart';
+import 'Logger.dart';
 
 class ExtensionManager extends GetxController {
   final managers = <Extension>[].obs;
@@ -121,7 +111,11 @@ class ExtensionManager extends GetxController {
         listChanged = true;
       }
 
-      await (existingManager ?? manager).initialize();
+      try {
+        await (existingManager ?? manager).initialize();
+      } catch (e, s) {
+        Logger.log('Error initializing manager ${manager.id}: $e\n$s');
+      }
 
       if (existingManager == null) {
         for (final type in ItemType.values) {

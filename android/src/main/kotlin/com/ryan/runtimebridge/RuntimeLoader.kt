@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import dalvik.system.BaseDexClassLoader
 import dalvik.system.DexClassLoader
 import java.io.File
 import java.util.zip.ZipFile
@@ -12,10 +11,68 @@ import java.util.zip.ZipFile
 object RuntimeLoader {
 
     private const val TAG = "RuntimeLoader"
-    private val loadedPaths = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
-    @SuppressLint("UnsafeDynamicallyLoadedCode")
-    private fun preloadNativeLibraries(context: Context, apkFile: File) {
+    private class ChildFirstClassLoader(
+        dexPath: String,
+        optimizedDirectory: String?,
+        private val librarySearchPath: String?,
+        parent: ClassLoader
+    ) : DexClassLoader(dexPath, optimizedDirectory, librarySearchPath, parent) {
+
+        private val systemClassLoader: ClassLoader? = getSystemClassLoader()
+
+        private fun shouldDelegateToParent(name: String?): Boolean {
+            if (name == null) return false
+            return name.startsWith("android.") ||
+                name.startsWith("androidx.") ||
+                name.startsWith("java.") ||
+                name.startsWith("javax.") ||
+                name.startsWith("io.flutter.") ||
+                name.startsWith("com.ryan.runtimebridge.")
+        }
+
+        override fun loadClass(name: String?, resolve: Boolean): Class<*> {
+            var c = findLoadedClass(name)
+
+            if (c == null && systemClassLoader != null) {
+                try {
+                    c = systemClassLoader.loadClass(name)
+                } catch (_: ClassNotFoundException) {}
+            }
+
+            if (c == null && shouldDelegateToParent(name)) {
+                try {
+                    c = parent.loadClass(name)
+                } catch (_: ClassNotFoundException) {}
+            }
+
+            if (c == null) {
+                try {
+                    c = findClass(name)
+                } catch (_: ClassNotFoundException) {
+                    c = super.loadClass(name, resolve)
+                }
+            }
+
+            if (resolve) {
+                resolveClass(c)
+            }
+
+            return c
+        }
+
+        override fun findLibrary(name: String?): String? {
+            if (name != null && librarySearchPath != null) {
+                val direct = File(librarySearchPath, "lib$name.so")
+                if (direct.exists()) {
+                    return direct.absolutePath
+                }
+            }
+            return super.findLibrary(name)
+        }
+    }
+
+    private fun extractNativeLibraries(context: Context, apkFile: File) {
         val abiList = Build.SUPPORTED_ABIS
         val outDir = File(context.codeCacheDir, "plugin_libs").apply {
             mkdirs()
@@ -42,50 +99,18 @@ object RuntimeLoader {
                         val libName = entry.name.substringAfterLast('/')
                         val out = File(outDir, libName)
                         if (!out.exists() || out.length() != entry.size) {
+                            if (out.exists()) {
+                                out.setWritable(true, false)
+                                out.delete()
+                            }
                             zip.getInputStream(entry).use { input ->
                                 out.outputStream().use(input::copyTo)
                             }
-                            out.setReadable(true)
-                            out.setExecutable(true)
-                        }
-
-                        try {
-                            System.load(out.absolutePath)
-                            Log.i(TAG, "Loaded native library: ${out.name}")
-                        } catch (e: UnsatisfiedLinkError) {
-                            Log.w(TAG, "Native library already loaded or failed: ${out.name}")
+                            out.setReadable(true, false)
+                            out.setExecutable(true, false)
+                            out.setWritable(false, false)
                         }
                     }
-            }
-        }
-    }
-
-    private class RuntimeClassLoader(
-        dexPath: String,
-        optimizedDirectory: String?,
-        librarySearchPath: String?,
-        parent: ClassLoader
-    ) : DexClassLoader(dexPath, optimizedDirectory, librarySearchPath, parent) {
-
-        override fun loadClass(name: String, resolve: Boolean): Class<*> {
-            var c = findLoadedClass(name)
-            if (c != null) return c
-
-            if (name.startsWith("java.") ||
-                name.startsWith("javax.") ||
-                name.startsWith("android.") ||
-                name.startsWith("androidx.") ||
-                name.startsWith("kotlin.") ||
-                name.startsWith("io.flutter.") ||
-                name.startsWith("com.ryan.runtimebridge.")
-            ) {
-                return super.loadClass(name, resolve)
-            }
-
-            return try {
-                findClass(name).also { if (resolve) resolveClass(it) }
-            } catch (_: ClassNotFoundException) {
-                super.loadClass(name, resolve)
             }
         }
     }
@@ -118,9 +143,22 @@ object RuntimeLoader {
                 }
             }
             tmp.setLastModified(externalFile.lastModified())
+            if (dst.exists()) {
+                dst.setWritable(true, false)
+                dst.delete()
+            }
             if (!tmp.renameTo(dst)) {
+                tmp.inputStream().use { input ->
+                    dst.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
                 tmp.delete()
-                throw IllegalStateException("Failed to replace runtime APK file")
+            }
+            val optimizedDir = File(context.codeCacheDir, "plugin_opt")
+            if (optimizedDir.exists()) {
+                optimizedDir.deleteRecursively()
+                optimizedDir.mkdirs()
             }
         }
 
@@ -132,34 +170,17 @@ object RuntimeLoader {
             if (!exists()) mkdirs()
         }
 
-        preloadNativeLibraries(context, dst)
+        extractNativeLibraries(context, dst)
 
-        if (loadedPaths.add(dst.absolutePath)) {
-            val classLoader = context.classLoader
-            val pathListField = BaseDexClassLoader::class.java.getDeclaredField("pathList").apply {
-                isAccessible = true
-            }
-            val pathList = pathListField.get(classLoader)
-
-            val addDexPath = pathList.javaClass.getDeclaredMethod(
-                "addDexPath",
-                String::class.java,
-                File::class.java
-            ).apply {
-                isAccessible = true
-            }
-
-            addDexPath.invoke(pathList, dst.absolutePath, optimizedDir)
-        }
-
-        val runtimeClassLoader = RuntimeClassLoader(
+        val nativeLibsDir = File(context.codeCacheDir, "plugin_libs")
+        val loader = ChildFirstClassLoader(
             dst.absolutePath,
             optimizedDir.absolutePath,
-            File(context.codeCacheDir, "plugin_libs").absolutePath,
+            nativeLibsDir.absolutePath,
             context.classLoader
         )
 
-        val clazz = runtimeClassLoader.loadClass(className)
+        val clazz = loader.loadClass(className)
         val instance = try {
             clazz.getField("INSTANCE").get(null)
         } catch (_: Exception) {

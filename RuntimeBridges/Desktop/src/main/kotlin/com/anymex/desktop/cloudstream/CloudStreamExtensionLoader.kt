@@ -33,17 +33,25 @@ object CloudStreamExtensionLoader {
     fun initialize() {
         if (initialized) return
         
-        val context = Application()
-        
-        Injekt.addSingletonFactory<Application> { context }
-        Injekt.addSingletonFactory<Context> { context }
-        Injekt.addSingletonFactory { NetworkHelper(context) }
-        Injekt.addSingletonFactory<okhttp3.OkHttpClient> { Injekt.get<NetworkHelper>().client }
-        Injekt.addSingletonFactory<Json> {
-            Json {
-                ignoreUnknownKeys = true
-                explicitNulls = false
-            }
+        try {
+            val context = Application()
+            com.lagradost.cloudstream3.CloudStreamApp.context = context
+            try { com.lagradost.cloudstream3.utils.DataStore.init(context) } catch (_: Throwable) {}
+            
+            try { Injekt.addSingletonFactory<Application> { context } } catch (_: Throwable) {}
+            try { Injekt.addSingletonFactory<Context> { context } } catch (_: Throwable) {}
+            try { Injekt.addSingletonFactory { NetworkHelper(context) } } catch (_: Throwable) {}
+            try { Injekt.addSingletonFactory<okhttp3.OkHttpClient> { Injekt.get<NetworkHelper>().client } } catch (_: Throwable) {}
+            try {
+                Injekt.addSingletonFactory<Json> {
+                    Json {
+                        ignoreUnknownKeys = true
+                        explicitNulls = false
+                    }
+                }
+            } catch (_: Throwable) {}
+        } catch (e: Throwable) {
+            System.err.println("CloudStream initialize error: ${e.message}")
         }
         initialized = true
         System.err.println("CloudStream Runtime initialized!")

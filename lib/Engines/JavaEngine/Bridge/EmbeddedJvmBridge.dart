@@ -154,7 +154,7 @@ class EmbeddedJvmBridge {
   Future<dynamic> invokeMethod(
     String method,
     Map<String, dynamic> args, {
-    Duration timeout = const Duration(seconds: 60),
+    Duration timeout = const Duration(minutes: 2),
   }) async {
     if (!_loaded || _jarPath == null) {
       throw Exception('Embedded JVM bridge not initialized');
@@ -180,7 +180,16 @@ class EmbeddedJvmBridge {
       }
 
       final data = decodedEnvelope['data'];
-      final decoded = data is String ? jsonDecode(data) : data;
+      dynamic decoded;
+      if (data is String) {
+        try {
+          decoded = jsonDecode(data);
+        } catch (_) {
+          decoded = data;
+        }
+      } else {
+        decoded = data;
+      }
       Logger.log('[JVM] $label ok in ${watch.elapsedMilliseconds} ms');
       return decoded;
     } catch (e, s) {
