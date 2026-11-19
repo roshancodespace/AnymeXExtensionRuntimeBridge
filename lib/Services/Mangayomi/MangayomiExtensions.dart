@@ -30,6 +30,9 @@ class MangayomiExtensions extends Extension {
       'https://raw.githubusercontent.com/kodjodevf/mangayomi/main/assets/app_icons/icon-red.png';
 
   @override
+  Source parseSourceJson(Map<String, dynamic> json) => MSource.fromJson(json);
+
+  @override
   SourceMethods createSourceMethods(Source source) =>
       MangayomiSourceMethods(source);
 
@@ -57,11 +60,14 @@ class MangayomiExtensions extends Extension {
 
   Future<List<Source>> _fetchExtensions(ItemType type) async {
     final repos = _loadRepos(type);
-    final allSources = <Source>[];
+    final repoResults = await Future.wait(
+      repos.map((repo) => _fetchRepoSources(repo, type)),
+    );
+    final allSources = repoResults.expand((sources) => sources).toList();
 
-    for (final repo in repos) {
-      final sources = await _fetchRepoSources(repo, type);
-      allSources.addAll(sources);
+    if (repos.isNotEmpty && allSources.isEmpty) {
+      Logger.log("No Mangayomi sources fetched. Keeping cached sources.");
+      return getAvailableRx(type).value;
     }
 
     final rawRx = getRawAvailableRx(type);
@@ -74,6 +80,8 @@ class MangayomiExtensions extends Extension {
         allSources.where((s) => !installedIds.contains(s.id)).toList();
 
     getAvailableRx(type).value = List.unmodifiable(filtered);
+    saveCachedSources(type, allSources, raw: true);
+    saveCachedSources(type, filtered);
     return filtered;
   }
 
@@ -350,15 +358,13 @@ class MangayomiExtensions extends Extension {
   Future<void> removeRepo(String repoUrl, ItemType type) async {
     try {
       final repos = _loadRepos(type)
-          .where((r) => r.url != repoUrl)
+          .where((r) => !Extension.isMatchingRepoUrl(r.url, repoUrl))
           .toList(growable: false);
 
       _saveRepos(repos, type);
-
-      final rx = getAvailableRx(type);
-      rx.value = rx.value.where((s) => s.repo != repoUrl).toList();
-
       getReposRx(type).value = repos;
+
+      purgeRepoFromAvailable(repoUrl, type);
     } catch (e) {
       Logger.log("Failed to remove repo $repoUrl: $e");
     }

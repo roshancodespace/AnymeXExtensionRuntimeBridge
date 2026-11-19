@@ -99,9 +99,21 @@ class DesktopAniyomiExtensions extends DesktopExtensionBase {
 
       final parsed = <ASource>[];
 
-      final list = result is List
-          ? result
-          : (result is String ? (jsonDecode(result) as List? ?? []) : []);
+      List<dynamic> list = [];
+      if (result is List) {
+        list = result;
+      } else if (result is String) {
+        try {
+          final decoded = jsonDecode(result);
+          if (decoded is List) {
+            list = decoded;
+          } else if (decoded is Map && decoded['data'] is List) {
+            list = decoded['data'] as List;
+          }
+        } catch (_) {}
+      } else if (result is Map && result['data'] is List) {
+        list = result['data'] as List;
+      }
 
       for (final e in list) {
         final map = e as Map<String, dynamic>;
@@ -280,10 +292,12 @@ class DesktopAniyomiExtensions extends DesktopExtensionBase {
                 : name.startsWith('Tachiyomi: ')
                     ? name.substring(10)
                     : name,
-            pkgName: map['pkg'],
-            apkName: rawApkUrl.startsWith('http') ? rawApkUrl : map['apk'],
-            lang: map['lang'],
-            version: map['version'],
+            pkgName: map['pkg']?.toString(),
+            apkName: (rawApkUrl.startsWith('http') ? rawApkUrl : map['apk'])?.toString(),
+            lang: map['lang'] is List
+                ? (map['lang'] as List).map((e) => e.toString()).join(',')
+                : map['lang']?.toString(),
+            version: map['version']?.toString(),
             isNsfw: map['isNsfw'] ?? false,
             itemType: detectedType,
             repo: repoUrl,
@@ -399,31 +413,53 @@ class DesktopAniyomiExtensions extends DesktopExtensionBase {
   Future<void> removeRepo(String repoUrl, ItemType type) async {
     try {
       final repos = _loadRepos(type)
-          .where((r) => r.url != repoUrl)
+          .where((r) => !Extension.isMatchingRepoUrl(r.url, repoUrl))
           .toList(growable: false);
       _saveRepos(repos, type);
-
-      final rx = getAvailableRx(type);
-      rx.value = rx.value.where((s) => s.repo != repoUrl).toList();
-
       getReposRx(type).value = repos;
+
+      purgeRepoFromAvailable(repoUrl, type);
     } catch (e) {
       Logger.log("Failed to remove repo $repoUrl: $e");
     }
   }
 
   List<Repo> _loadRepos(ItemType type) {
-    final newKey = 'aniyomi${type.name}Repos';
-    final oldKey = 'aniyomi${type.name}ReposV2';
+    try {
+      final newKey = 'aniyomi${type.name}Repos';
+      final oldKey = 'aniyomi${type.name}ReposV2';
 
-    final encoded =
-        getVal<List<String>>(newKey) ?? getVal<List<String>>(oldKey);
-    if (encoded == null || encoded.isEmpty) return const [];
+      final raw = getVal(newKey) ?? getVal(oldKey);
+      if (raw == null) return const [];
 
-    return encoded
-        .map((e) => Repo.fromJson(jsonDecode(e)))
-        .toSet()
-        .toList(growable: false);
+      final repos = <Repo>[];
+      if (raw is List) {
+        for (final item in raw) {
+          try {
+            if (item is String) {
+              final trimmed = item.trim();
+              if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+                final decoded = jsonDecode(trimmed);
+                if (decoded is Map<String, dynamic>) {
+                  repos.add(Repo.fromJson(decoded));
+                } else if (decoded is Map) {
+                  repos.add(Repo.fromJson(Map<String, dynamic>.from(decoded)));
+                }
+              } else if (trimmed.isNotEmpty) {
+                repos.add(Repo(url: trimmed, managerId: id));
+              }
+            } else if (item is Map<String, dynamic>) {
+              repos.add(Repo.fromJson(item));
+            } else if (item is Map) {
+              repos.add(Repo.fromJson(Map<String, dynamic>.from(item)));
+            }
+          } catch (_) {}
+        }
+      }
+      return repos.toSet().toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
   }
 
   void _saveRepos(List<Repo> repos, ItemType type) {
