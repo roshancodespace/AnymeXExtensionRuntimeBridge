@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'PbDecoder.dart';
-import 'package:device_apps/device_apps.dart';
+import 'package:flutter_device_apps/flutter_device_apps.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:install_plugin/install_plugin.dart';
@@ -150,7 +150,8 @@ class AniyomiExtensions extends Extension {
       for (final s in parsed) {
         if (s.pkgName != null && s.pkgName!.isNotEmpty) {
           try {
-            final isSys = await DeviceApps.isAppInstalled(s.pkgName!);
+            final isSys =
+                await FlutterDeviceAppsAndroid.isAppInstalled(s.pkgName!);
             s.isPrivate = !isSys;
           } catch (_) {}
         }
@@ -245,7 +246,8 @@ class AniyomiExtensions extends Extension {
     try {
       final res = await _client.get(Uri.parse(repo.url));
       if (res.statusCode != 200) return const [];
-      return await compute(_parseExtensions, (res.bodyBytes, repo.url, type, id));
+      return await compute(
+          _parseExtensions, (res.bodyBytes, repo.url, type, id));
     } catch (e) {
       Logger.log("Repo failed ${repo.url}: $e");
       return const [];
@@ -294,8 +296,8 @@ class AniyomiExtensions extends Extension {
               return {
                 'name': extMap['name'],
                 'pkg': extMap['packageName'] ?? extMap['pkg'],
-                'apk': res?['apkUrl']?.toString().split('/').last ??
-                    extMap['apk'],
+                'apk':
+                    res?['apkUrl']?.toString().split('/').last ?? extMap['apk'],
                 'apkUrl': res?['apkUrl'],
                 'iconUrl': res?['iconUrl'],
                 'lang': (sources != null && sources.isNotEmpty)
@@ -341,12 +343,12 @@ class AniyomiExtensions extends Extension {
         final name = map['name'] as String? ?? '';
         final pkg = map['pkg'] as String? ?? '';
 
-        var detectedType = (name.startsWith('AniZen: ') ||
-                name.startsWith('Aniyomi: '))
-            ? ItemType.anime
-            : name.startsWith('Tachiyomi: ')
-                ? ItemType.manga
-                : null;
+        var detectedType =
+            (name.startsWith('AniZen: ') || name.startsWith('Aniyomi: '))
+                ? ItemType.anime
+                : name.startsWith('Tachiyomi: ')
+                    ? ItemType.manga
+                    : null;
 
         if (detectedType == null) {
           if (pkg.contains('.anime.')) {
@@ -381,7 +383,8 @@ class AniyomiExtensions extends Extension {
                 : '',
             name: cleanName,
             pkgName: map['pkg']?.toString(),
-            apkName: (rawApkUrl.startsWith('http') ? rawApkUrl : map['apk'])?.toString(),
+            apkName: (rawApkUrl.startsWith('http') ? rawApkUrl : map['apk'])
+                ?.toString(),
             lang: map['lang'] is List
                 ? (map['lang'] as List).map((e) => e.toString()).join(',')
                 : map['lang']?.toString(),
@@ -561,7 +564,8 @@ class AniyomiExtensions extends Extension {
       bool isSystemInstalled = false;
       if (aSource.pkgName != null && aSource.pkgName!.isNotEmpty) {
         try {
-          isSystemInstalled = await DeviceApps.isAppInstalled(aSource.pkgName!);
+          isSystemInstalled =
+              await FlutterDeviceAppsAndroid.isAppInstalled(aSource.pkgName!);
         } catch (_) {}
       }
 
@@ -660,9 +664,11 @@ class AniyomiExtensions extends Extension {
         });
       } catch (_) {}
 
-      final isSystemInstalled = await DeviceApps.isAppInstalled(packageName);
+      final isSystemInstalled =
+          await FlutterDeviceAppsAndroid.isAppInstalled(packageName);
       if (isSystemInstalled) {
-        final success = await DeviceApps.uninstallApp(packageName);
+        final success =
+            await FlutterDeviceAppsAndroid.uninstallApp(packageName);
         if (!success) {
           throw Exception(
               'Failed to initiate uninstallation for: $packageName');
@@ -672,12 +678,14 @@ class AniyomiExtensions extends Extension {
         final start = DateTime.now();
 
         while (DateTime.now().difference(start) < timeout) {
-          final stillInstalled = await DeviceApps.isAppInstalled(packageName);
+          final stillInstalled =
+              await FlutterDeviceAppsAndroid.isAppInstalled(packageName);
           if (!stillInstalled) break;
           await Future.delayed(const Duration(milliseconds: 500));
         }
 
-        final finalCheck = await DeviceApps.isAppInstalled(packageName);
+        final finalCheck =
+            await FlutterDeviceAppsAndroid.isAppInstalled(packageName);
         if (finalCheck) {
           throw Exception('Uninstallation timed out or was cancelled by user.');
         }

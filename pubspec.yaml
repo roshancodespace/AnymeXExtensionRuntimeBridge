@@ -36,7 +36,7 @@ dependencies:
             url: https://github.com/kodjodevf/epubx.dart.git
             ref: dev
     install_plugin: ^2.1.0
-    device_apps: ^2.2.0
+    flutter_device_apps: ^2.1.0
     file_picker: ^8.1.7
     archive: ^4.0.9
     ffi: ^2.1.2
